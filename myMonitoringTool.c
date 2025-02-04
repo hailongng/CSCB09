@@ -1,3 +1,5 @@
+#define _DEFAULT_SOURCE
+
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -62,7 +64,7 @@ void memory_display(int sample_count, int tdelay) {
 	strcpy(graph[10][0], "0 GB\0");
 	sprintf(graph[0][0], "%.2f", total_ram / 1073741824);	
 	strcat(graph[0][0], " GB\0");
-	for (int i = 2; i <= 80; i++) {
+	for (int i = 2; i <= min(MAXIMUM_SAMPLE_SIZE, sample_count); i++) {
 		strcpy(graph[10][i], "_\0");
 	}
 	for (int i = 0; i <= 10; i++) {
@@ -117,7 +119,7 @@ void cpu_display(int sample_count, int tdelay)  {
 	}
 	strcpy(graph[10][0], "0\%\0");
 	strcpy(graph[0][0], "100\%\0");
-	for (int i = 1; i <= 80; i++) {
+	for (int i = 1; i <= min(MAXIMUM_SAMPLE_SIZE, sample_count); i++) {
 		strcpy(graph[10][i], "_\0");
 	}
 	for (int i = 0; i <= 10; i++) {
@@ -181,7 +183,7 @@ void duo_display(int sample_count, int tdelay) {
 	strcat(memory_graph[0][0], " GB\0");
 	strcpy(cpu_graph[10][0], "0\%\0");
 	strcpy(cpu_graph[0][0], "100\%\0");
-	for (int i = 1; i <= 80; i++) {
+	for (int i = 2; i <= min(MAXIMUM_SAMPLE_SIZE, sample_count) + 1; i++) {
 		strcpy(memory_graph[10][i], "_\0");
 		strcpy(cpu_graph[10][i], "_\0");
 	}
@@ -198,7 +200,7 @@ void duo_display(int sample_count, int tdelay) {
 	for (int instance = 2; instance < sample_count + 2; instance++) {
 		printf("\033[2J");
 		printf("\033[H");
-		sleep(1.5);
+		usleep(500000);
 		// STEP 1: MEMORY
 		grab_memory_info(&freeram);
 		ram_used = total_ram - freeram;
@@ -240,8 +242,8 @@ void duo_display(int sample_count, int tdelay) {
 			printf("\n");
 		}
 		// Remember to reassign the value for future use
-		total_cpu_time_1 = total_cpu_time_2;
-		total_cpu_util_time_1 = total_cpu_util_time_2;
+		// total_cpu_time_1 = total_cpu_time_2;
+		// total_cpu_util_time_1 = total_cpu_util_time_2;
 	}
 }
 
@@ -297,41 +299,39 @@ void flag_checker(int argc, char** argv, char* str, int* flag) {
 	}
 }
 
-int tdelay_checker(int argc, char** argv, int* flag) {
-	int val = 0;
+void tdelay_checker(int argc, char** argv, int* val) {
 	for (int i = 0; i < argc; i++) {
 		if (strstr(argv[i], "--tdelay") != NULL) {
-			sscanf(argv[i], "--tdelay=%d", &val);
+			sscanf(argv[i], "--tdelay=%d", &(*val));
 		}
 	}
-	return val;
 }
 
-int sample_count_checker(int argc, char** argv, int* flag) {
-	int val = 0;
+int sample_count_checker(int argc, char** argv, int* val) {
 	for (int i = 0; i < argc; i++) {
 		if (strstr(argv[i], "--samples") != NULL) {
-			sscanf(argv[i], "--samples=%d", &val);
+			sscanf(argv[i], "--samples=%d", &(*val));
 		}
 	}
-	return val;
 }
 
 int main (int argc, char** argv) {
-	printf("\033[2J");
-	printf("\033[H");
 	int core_flag = 0, cpu_flag = 0, memory_flag = 0;
 	int sample_count = DEFAULT_SAMPLE_SIZE;
 	int tdelay = DEFAULT_TIME_DELAY;
-	if (argc == 1) {
-		core_flag = cpu_flag = memory_flag = 1; 																			
-	}
 	if (argc > 6) {
 		return 0;
+	}
+	if (argc == 1) {
+		core_flag = 1;
+		cpu_flag = 1;
+		memory_flag = 1; 																			
 	}	
 	flag_checker(argc, argv, "--memory", &memory_flag);
 	flag_checker(argc, argv, "--cpu", &cpu_flag);
 	flag_checker(argc, argv, "--cores", &core_flag);
+	sample_count_checker(argc, argv, &sample_count);
+	tdelay_checker(argc, argv, &tdelay);
 	if (memory_flag == 0 && core_flag == 0 && cpu_flag == 0) {
 		if (argc == 2) {
 			sample_count = atoi(argv[1]);
@@ -341,9 +341,17 @@ int main (int argc, char** argv) {
 			tdelay = atoi(argv[2]);
 		}
 	}
+	if (sample_count <= 0) {
+		printf("Invalid value. Sample count must be positive.\n");
+		return 0;
+	}
+	if (tdelay <= 0) {
+		printf("Invalid value. Time delay must be positive.\n");
+		return 0;
+	}
 	// cpu_display(4, tdelay);
 	// memory_display(20, tdelay);
-	// duo_display(6, tdelay);
-	core_display(14);
+	duo_display(10, tdelay);
+	core_display();
 	return 0;
 }
