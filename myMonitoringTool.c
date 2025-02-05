@@ -10,7 +10,7 @@
 #include<unistd.h>
 
 #ifndef DEFAULT_SAMPLE_SIZE
-#define DEFAULT_SAMPLE_SIZE 20
+#define DEFAULT_SAMPLE_SIZE 8
 #endif
 
 #ifndef MAXIMUM_SAMPLE_SIZE
@@ -86,7 +86,7 @@ void memory_display(int sample_count, int tdelay) {
 			for (int j = 0; j <= 22; j++) {
 				printf("%s", graph[i][j]);
 				if (j == 0) {
-					printf("\t");
+					printf("\t\t");
 				}
 			}
 			printf("\n");
@@ -151,7 +151,7 @@ void cpu_display(int sample_count, int tdelay)  {
 			for (int j = 0; j <= 22; j++) {
 				printf("%s", graph[i][j]);
 				if (j == 0) {
-					printf("\t");
+					printf("\t\t");
 				}
 			}
 			printf("\n");
@@ -178,9 +178,9 @@ void duo_display(int sample_count, int tdelay) {
 			strcpy(cpu_graph[i][j], "\0");
 		}
 	}
-	strcpy(memory_graph[10][0], "0 GB\0");
-	sprintf(memory_graph[0][0], "%.2f", total_ram / 1073741824);	
-	strcat(memory_graph[0][0], " GB\0");
+	strcpy(memory_graph[10][0], "0GB\0");
+	sprintf(memory_graph[0][0], "%.1f", total_ram / 1073741824);	
+	strcat(memory_graph[0][0], "GB\0");
 	strcpy(cpu_graph[10][0], "0\%\0");
 	strcpy(cpu_graph[0][0], "100\%\0");
 	for (int i = 2; i <= min(MAXIMUM_SAMPLE_SIZE, sample_count) + 1; i++) {
@@ -217,8 +217,8 @@ void duo_display(int sample_count, int tdelay) {
 		total_cpu_util_time_2 = total_cpu_time_2 - cpu_data[3];
 		double ratio = ((double)10.0 * (total_cpu_util_time_2 - total_cpu_util_time_1)) / 
 						((double)(total_cpu_time_2 - total_cpu_time_1));
-		int cpu_index_to_find = 10 - (int)round(ratio);
-		cpu_graph[cpu_index_to_find][instance][0] = ':';
+		int cpu_index_to_find = min(10 - (int)round(ratio), 10);
+		cpu_graph[cpu_index_to_find][instance][0] = ;
 		cpu_graph[cpu_index_to_find][instance][1] = '\0';
 		// STEP 3: PRINT
 		printf("RAM used: %.4f GB\n", ram_used / 1073741824);
@@ -241,9 +241,10 @@ void duo_display(int sample_count, int tdelay) {
 			}
 			printf("\n");
 		}
+		printf("%d %d\n", cpu_index_to_find, instance);
 		// Remember to reassign the value for future use
-		// total_cpu_time_1 = total_cpu_time_2;
-		// total_cpu_util_time_1 = total_cpu_util_time_2;
+		total_cpu_time_1 = total_cpu_time_2;
+		total_cpu_util_time_1 = total_cpu_util_time_2;
 	}
 }
 
@@ -264,23 +265,17 @@ void core_row_display(int cores_per_row) {
 
 void core_display() {
 	int number_of_cores = get_nprocs_conf();
-	FILE *cpuinfo = fopen("/proc/cpuinfo", "r");
+	FILE *cpuinfo = fopen("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq", "r");
     if (!cpuinfo) {
-        perror("Failed to open /proc/cpuinfo");
+        perror("Failed to open /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq");
         return;
     }
     char line[256];
     double max_frequency = 0.0, curr_freq;
     while (fgets(line, sizeof(line), cpuinfo)) {
-        if (strncmp(line, "cpu MHz", 7) == 0) {
-            if (sscanf(line, "cpu MHz\t: %lf", &curr_freq) == 1) {
-                if (curr_freq > max_frequency) {
-					max_frequency = curr_freq;
-				}
-            }
-        }
-	}
-	max_frequency /= 1000;
+	    max_frequency = atoi(line);
+    }
+	max_frequency /= 1000000;
 	printf("Number of cores: %d @ %.2f GHz\n", number_of_cores, max_frequency);
 	while (number_of_cores >= 4) {
 		core_row_display(4);
@@ -349,9 +344,17 @@ int main (int argc, char** argv) {
 		printf("Invalid value. Time delay must be positive.\n");
 		return 0;
 	}
-	// cpu_display(4, tdelay);
-	// memory_display(20, tdelay);
-	duo_display(10, tdelay);
-	core_display();
+	if (cpu_flag == 1 && memory_flag == 1) {
+		duo_display(sample_count, tdelay);
+	}
+	else if (cpu_flag == 1) {
+		cpu_display(sample_count, tdelay);
+	}
+	else if (memory_flag == 1) {
+		memory_display(sample_count, tdelay);
+	}
+	if (core_flag == 1) {
+		core_display();
+	}
 	return 0;
 }
