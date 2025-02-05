@@ -372,11 +372,17 @@ int main (int argc, char** argv) {
 		printf("Invalid value. Time delay must be positive.\n");
 		return 0;
 	}
-	// cpu_display(4, tdelay);
-	// memory_display(min(MAXIMUM_SAMPLE_SIZE, sample_count), min(MAXIMUM_TIME_DELAY, tdelay));
-    	// memory_display(30, min(MAXIMUM_TIME_DELAY, tdelay));
-	// cpu_display(70, 100000);
-	duo_display(10, tdelay);
-	core_display();
+	if (memory_flag == 1 && cpu_flag == 1) {
+		duo_display(min(sample_count, MAXIMUM_SAMPLE_SIZE), min(tdelay, MAXIMUM_TIME_DELAY));
+	}
+	else if (memory_flag == 1) {
+		memory_display(min(sample_count, MAXIMUM_SAMPLE_SIZE), min(tdelay, MAXIMUM_TIME_DELAY));
+	}
+	else if (cpu_flag == 1) {
+		cpu_display(min(sample_count, MAXIMUM_SAMPLE_SIZE), min(tdelay, MAXIMUM_TIME_DELAY));
+	}
+	if (core_flag == 1) {
+		core_display();
+	}
 	return 0;
 }
