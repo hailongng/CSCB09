@@ -21,8 +21,8 @@
 #define DEFAULT_TIME_DELAY 500000
 #endif
 
-#ifndef MAXIMUM_TIME_DELAY
-#define MAXIMUM_TIME_DELAY 1000000
+#ifndef MINIMUM_TIME_DELAY
+#define MINIMUM_TIME_DELAY 100000
 #endif
 
 int sysinfo(struct sysinfo *info);
@@ -30,6 +30,13 @@ int get_nprocs_conf(void);
 
 int min(int a, int b) {
 	if (a <= b) {
+		return a;
+	}
+	return b;
+}
+
+int max(int a, int b) {
+	if (a >= b) {
 		return a;
 	}
 	return b;
@@ -98,7 +105,7 @@ void memory_display(int sample_count, int tdelay) {
 	for (int instance = 0; instance < sample_count; instance++) {
 		printf("\033[2J");
 		printf("\033[H");
-		usleep(500000);
+		usleep(tdelay);
 		grab_memory_info(&freeram);
 		ram_used = total_ram - freeram;
 		double f_index_to_find = ram_used * 100.0 / total_ram;
@@ -160,7 +167,7 @@ void cpu_display(int sample_count, int tdelay)  {
 		printf("\033[2J");
 		printf("\033[H");
         total_cpu_time_2 = 0;
-        usleep(500000);
+        usleep(tdelay);
 		grab_cpu_info(cpu_data);
 		for (int i = 0; i <= 6; i++) {
 			total_cpu_time_2 += cpu_data[i];
@@ -222,7 +229,7 @@ void duo_display(int sample_count, int tdelay) {
 	for (int instance = 0; instance < sample_count; instance++) {
 		printf("\033[2J");
 		printf("\033[H");
-		usleep(500000);
+		usleep(tdelay);
 		// STEP 1: MEMORY
 		grab_memory_info(&freeram);
 		ram_used = total_ram - freeram;
@@ -348,22 +355,27 @@ int main (int argc, char** argv) {
 	if (argc == 1) {
 		core_flag = 1;
 		cpu_flag = 1;
-		memory_flag = 1; 																			
-	}	
-	flag_checker(argc, argv, "--memory", &memory_flag);
-	flag_checker(argc, argv, "--cpu", &cpu_flag);
-	flag_checker(argc, argv, "--cores", &core_flag);
-	sample_count_checker(argc, argv, &sample_count);
-	tdelay_checker(argc, argv, &tdelay);
-	if (memory_flag == 0 && core_flag == 0 && cpu_flag == 0) {
-		if (argc == 2) {
-			sample_count = atoi(argv[1]);
-		}
-		else {
-			sample_count = atoi(argv[1]);
-			tdelay = atoi(argv[2]);
+		memory_flag = 1; 													}
+	else {	
+		flag_checker(argc, argv, "--memory", &memory_flag);
+		flag_checker(argc, argv, "--cpu", &cpu_flag);
+		flag_checker(argc, argv, "--cores", &core_flag);
+		sample_count_checker(argc, argv, &sample_count);
+		tdelay_checker(argc, argv, &tdelay);
+		if (memory_flag == 0 && core_flag == 0 && cpu_flag == 0) {
+			if (argc == 2) {
+				sample_count = atoi(argv[1]);
+			}
+			else {
+				sample_count = atoi(argv[1]);
+				tdelay = atoi(argv[2]);
+			}
+			core_flag = 1;
+			cpu_flag = 1;
+			memory_flag = 1;
 		}
 	}
+	printf("%d %d\n", sample_count, tdelay);
 	if (sample_count <= 0) {
 		printf("Invalid value. Sample count must be positive.\n");
 		return 0;
@@ -373,13 +385,13 @@ int main (int argc, char** argv) {
 		return 0;
 	}
 	if (memory_flag == 1 && cpu_flag == 1) {
-		duo_display(min(sample_count, MAXIMUM_SAMPLE_SIZE), min(tdelay, MAXIMUM_TIME_DELAY));
+		duo_display(min(sample_count, MAXIMUM_SAMPLE_SIZE), max(tdelay, MINIMUM_TIME_DELAY));
 	}
 	else if (memory_flag == 1) {
-		memory_display(min(sample_count, MAXIMUM_SAMPLE_SIZE), min(tdelay, MAXIMUM_TIME_DELAY));
+		memory_display(min(sample_count, MAXIMUM_SAMPLE_SIZE), max(tdelay, MINIMUM_TIME_DELAY));
 	}
 	else if (cpu_flag == 1) {
-		cpu_display(min(sample_count, MAXIMUM_SAMPLE_SIZE), min(tdelay, MAXIMUM_TIME_DELAY));
+		cpu_display(min(sample_count, MAXIMUM_SAMPLE_SIZE), max(tdelay, MINIMUM_TIME_DELAY));
 	}
 	if (core_flag == 1) {
 		core_display();
