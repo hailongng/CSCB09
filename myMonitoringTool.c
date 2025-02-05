@@ -10,7 +10,7 @@
 #include<unistd.h>
 
 #ifndef DEFAULT_SAMPLE_SIZE
-#define DEFAULT_SAMPLE_SIZE 8
+#define DEFAULT_SAMPLE_SIZE 20
 #endif
 
 #ifndef MAXIMUM_SAMPLE_SIZE
@@ -22,7 +22,7 @@
 #endif
 
 #ifndef MAXIMUM_TIME_DELAY
-#define MAXIMUM_TIME_DELAY 500000
+#define MAXIMUM_TIME_DELAY 1000000
 #endif
 
 int sysinfo(struct sysinfo *info);
@@ -33,6 +33,37 @@ int min(int a, int b) {
 		return a;
 	}
 	return b;
+}
+
+int find_index(double value) {
+	if ((value >= 0) && (value < 10)) {
+		return 9;
+	}
+	else if (value < 20) {
+		return 8;
+	}
+	else if (value < 30) {
+		return 7;
+	}
+	else if (value < 40) {
+		return 6;
+	}
+	else if (value < 50) {
+		return 5;
+	}
+	else if (value < 60) {
+		return 4;
+	}
+	else if (value < 70) {
+		return 3;
+	}
+	else if (value < 80) {
+		return 2;
+	}
+	else if (value < 90) {
+		return 1;
+	}
+	return 0;
 }
 
 void grab_memory_info(double* freeram) {
@@ -46,7 +77,15 @@ void grab_memory_info(double* freeram) {
 }
 
 void memory_display(int sample_count, int tdelay) {
-	// Grab upper bound
+    char graph[13][85];
+    for (int i = 0; i < 13; i++) {
+        for (int j = 0; j < 85; j++) {
+            graph[i][j] = ' ';
+        }
+    }
+    for (int j = 0; j <= sample_count; j++) {
+        graph[9][j] = '_';
+    }
 	double total_ram = 0.0, ram_used = 0.0, freeram = 0.0;
 	struct sysinfo* si = NULL;
 	si = calloc(1, sizeof(struct sysinfo));
@@ -55,42 +94,33 @@ void memory_display(int sample_count, int tdelay) {
 		total_ram = (double)si->totalram;
 	}
 	free(si);
-	char graph[12][85][10];
-	for (int i = 0; i < 12; i++) {
-		for (int j = 0; j < 85; j++) {
-			strcpy(graph[i][j], "\0");
-		}
-	}
-	strcpy(graph[10][0], "0 GB\0");
-	sprintf(graph[0][0], "%.2f", total_ram / 1073741824);	
-	strcat(graph[0][0], " GB\0");
-	for (int i = 2; i <= min(MAXIMUM_SAMPLE_SIZE, sample_count); i++) {
-		strcpy(graph[10][i], "_\0");
-	}
-	for (int i = 0; i <= 10; i++) {
-		strcpy(graph[i][1], "|\0");
-	}
+	double total_ram_in_gb = total_ram / 1073741824;
 	for (int instance = 0; instance < sample_count; instance++) {
 		printf("\033[2J");
 		printf("\033[H");
-		sleep(1.5);
+		usleep(500000);
 		grab_memory_info(&freeram);
 		ram_used = total_ram - freeram;
-		double f_index_to_find = (ram_used * 10.0 / total_ram);
-		int index_to_find = 10 - round(f_index_to_find);
-		graph[index_to_find][instance + 2][0] = '#';
-		graph[index_to_find][instance + 2][1] = '\0';
+		double f_index_to_find = ram_used * 100.0 / total_ram;
+		int index_to_find = find_index(f_index_to_find);
+		graph[index_to_find][instance] = '#';
 		// FACTOR THIS LATER
-		printf("RAM used: %.4f GB\n", ram_used / 1073741824);
-		for (int i = 0; i <= 10; i++) {
-			for (int j = 0; j <= 22; j++) {
-				printf("%s", graph[i][j]);
-				if (j == 0) {
-					printf("\t\t");
-				}
-			}
-			printf("\n");
-		}
+		printf("\t* RAM used: %.4f GB\n", ram_used / 1073741824);
+        for (int i = 0; i <= 9; i++) {
+            if (i == 0) {
+                printf("%.1fGB\t|", total_ram_in_gb);
+            }
+            else if (i == 9) {
+                printf("0GB\t|");
+            }
+            else {
+                printf("\t|");
+            }
+            for (int j = 0; j < sample_count; j++) {
+                printf("%c", graph[i][j]);
+            }
+            printf("\n");
+        }
 	}
 }
 
@@ -110,58 +140,70 @@ void grab_cpu_info(int* cpudata) {
 }
 
 void cpu_display(int sample_count, int tdelay)  {
-	char graph[12][85][10];
+	char graph[13][85];
 	int cpu_data[7];
-	for (int i = 0; i < 12; i++) {
+	for (int i = 0; i < 13; i++) {
 		for (int j = 0; j < 85; j++) {
-			strcpy(graph[i][j], "\0");
+			graph[i][j] = ' ';
 		}
 	}
-	strcpy(graph[10][0], "0\%\0");
-	strcpy(graph[0][0], "100\%\0");
-	for (int i = 1; i <= min(MAXIMUM_SAMPLE_SIZE, sample_count); i++) {
-		strcpy(graph[10][i], "_\0");
-	}
-	for (int i = 0; i <= 10; i++) {
-		strcpy(graph[i][1], "|\0");
-	}
+    for (int j = 0; j <= sample_count; j++) {
+        graph[9][j] = '_';
+    }
 	int total_cpu_util_time_1 = 0, total_cpu_util_time_2 = 0, total_cpu_time_1 = 0, total_cpu_time_2 = 0;
 	grab_cpu_info(cpu_data);
 	for (int i = 0; i <= 6; i++) {
 		total_cpu_time_1 += cpu_data[i];
 	}
 	total_cpu_util_time_1 = total_cpu_time_1 - cpu_data[3];
-	for (int instance = 2; instance < sample_count + 2; ++instance) {
+	for (int instance = 0; instance < sample_count; instance++) {
 		printf("\033[2J");
 		printf("\033[H");
-		total_cpu_time_2 = 0;
-		sleep(1.5);
+        total_cpu_time_2 = 0;
+        usleep(500000);
 		grab_cpu_info(cpu_data);
 		for (int i = 0; i <= 6; i++) {
 			total_cpu_time_2 += cpu_data[i];
 		}
 		total_cpu_util_time_2 = total_cpu_time_2 - cpu_data[3];
-		double ratio = ((double)10.0 * (total_cpu_util_time_2 - total_cpu_util_time_1)) / 
+		double ratio = ((double)100.0 * (total_cpu_util_time_2 - total_cpu_util_time_1)) / 
 						((double)(total_cpu_time_2 - total_cpu_time_1));
-		int index_to_find = 10 - (int)round(ratio);
-		printf("%.4f%% \n", 10 * ratio);
-		graph[index_to_find][instance][0] = ':';
-		graph[index_to_find][instance][1] = '\0';
-		for (int i = 0; i <= 10; i++) {
-			for (int j = 0; j <= 22; j++) {
-				printf("%s", graph[i][j]);
-				if (j == 0) {
-					printf("\t\t");
-				}
-			}
-			printf("\n");
-		}
+		int index_to_find = find_index(ratio);
+		graph[index_to_find][instance] = ':';
+		printf("CPU Usage: %f %% \t Index: %d\n", ratio, index_to_find);
+		for (int i = 0; i <= 9; i++) {
+            if (i == 0) {
+                printf("100%%\t|");
+            }
+            else if (i == 9) {
+                printf("0%%\t|");
+            }
+            else {
+                printf("\t|");
+            }
+            for (int j = 0; j < sample_count; j++) {
+                printf("%c", graph[i][j]);
+            }
+            printf("\n");
+        }
 		total_cpu_time_1 = total_cpu_time_2;
 		total_cpu_util_time_1 = total_cpu_util_time_2;
 	}
 }
 
 void duo_display(int sample_count, int tdelay) {
+      char memory_graph[13][85], cpu_graph[13][85];
+      	int cpu_data[7];
+    for (int i = 0; i < 13; i++) {
+        for (int j = 0; j < 85; j++) {
+            memory_graph[i][j] = ' ';
+            cpu_graph[i][j] = ' ';
+        }
+    }
+    for (int j = 0; j <= sample_count; j++) {
+        memory_graph[9][j] = '_';
+        cpu_graph[9][j] = '_';
+    }
 	double total_ram = 0.0, ram_used = 0.0, freeram = 0.0;
 	struct sysinfo* si = NULL;
 	si = calloc(1, sizeof(struct sysinfo));
@@ -170,44 +212,22 @@ void duo_display(int sample_count, int tdelay) {
 		total_ram = (double)si->totalram;
 	}
 	free(si);
-	int cpu_data[7];
-	char memory_graph[12][85][10], cpu_graph[12][85][10];
-	for (int i = 0; i < 12; i++) {
-		for (int j = 0; j < 85; j++) {
-			strcpy(memory_graph[i][j], "\0");
-			strcpy(cpu_graph[i][j], "\0");
-		}
-	}
-	strcpy(memory_graph[10][0], "0GB\0");
-	sprintf(memory_graph[0][0], "%.1f", total_ram / 1073741824);	
-	strcat(memory_graph[0][0], "GB\0");
-	strcpy(cpu_graph[10][0], "0\%\0");
-	strcpy(cpu_graph[0][0], "100\%\0");
-	for (int i = 2; i <= min(MAXIMUM_SAMPLE_SIZE, sample_count) + 1; i++) {
-		strcpy(memory_graph[10][i], "_\0");
-		strcpy(cpu_graph[10][i], "_\0");
-	}
-	for (int i = 0; i <= 10; i++) {
-		strcpy(memory_graph[i][1], "|\0");
-		strcpy(cpu_graph[i][1], "|\0");
-	}
+	double total_ram_in_gb = total_ram / 1073741824;
 	int total_cpu_util_time_1 = 0, total_cpu_util_time_2 = 0, total_cpu_time_1 = 0, total_cpu_time_2 = 0;
 	grab_cpu_info(cpu_data);
 	for (int i = 0; i <= 6; i++) {
 		total_cpu_time_1 += cpu_data[i];
 	}
 	total_cpu_util_time_1 = total_cpu_time_1 - cpu_data[3];
-	for (int instance = 2; instance < sample_count + 2; instance++) {
+	for (int instance = 0; instance < sample_count; instance++) {
 		printf("\033[2J");
 		printf("\033[H");
 		usleep(500000);
 		// STEP 1: MEMORY
 		grab_memory_info(&freeram);
 		ram_used = total_ram - freeram;
-		double f_memory_index_to_find = (ram_used * 10.0 / total_ram);
-		int memory_index_to_find = 10 - round(f_memory_index_to_find);
-		memory_graph[memory_index_to_find][instance][0] = '#';
-		memory_graph[memory_index_to_find][instance][1] = '\0';
+		int memory_index_to_find = find_index(ram_used * 100.0 / total_ram);
+		memory_graph[memory_index_to_find][instance] = '#';
 		// STEP 2: CPU
 		total_cpu_time_2 = 0;
 		grab_cpu_info(cpu_data);
@@ -215,39 +235,47 @@ void duo_display(int sample_count, int tdelay) {
 			total_cpu_time_2 += cpu_data[i];
 		}
 		total_cpu_util_time_2 = total_cpu_time_2 - cpu_data[3];
-		double ratio = ((double)10.0 * (total_cpu_util_time_2 - total_cpu_util_time_1)) / 
+		double ratio = ((double)100.0 * (total_cpu_util_time_2 - total_cpu_util_time_1)) / 
 						((double)(total_cpu_time_2 - total_cpu_time_1));
-		int cpu_index_to_find = min(10 - (int)round(ratio), 10);
-		cpu_graph[cpu_index_to_find][instance][0] = ;
-		cpu_graph[cpu_index_to_find][instance][1] = '\0';
-		// STEP 3: PRINT
-		printf("RAM used: %.4f GB\n", ram_used / 1073741824);
-		for (int i = 0; i <= 10; i++) {
-			for (int j = 0; j <= 22; j++) {
-				printf("%s", memory_graph[i][j]);
-				if (j == 0) {
-					printf("\t");
-				}
-			}
-			printf("\n");
-		}
-		printf("CPU Usage: %.4f%% \n", 10 * ratio);
-		for (int i = 0; i <= 10; i++) {
-			for (int j = 0; j <= 22; j++) {
-				printf("%s", cpu_graph[i][j]);
-				if (j == 0) {
-					printf("\t");
-				}
-			}
-			printf("\n");
-		}
-		printf("%d %d\n", cpu_index_to_find, instance);
-		// Remember to reassign the value for future use
-		total_cpu_time_1 = total_cpu_time_2;
+		int cpu_index_to_find = find_index(ratio);
+		cpu_graph[cpu_index_to_find][instance] = ':';
+		// FACTOR THIS LATER
+		printf("\t* RAM used: %.4f GB\n", ram_used / 1073741824);
+                for (int i = 0; i <= 9; i++) {
+                    if (i == 0) {
+                        printf("%.1fGB\t|", total_ram_in_gb);
+                    }
+                    else if (i == 9) {
+                        printf("0GB\t|");
+                    }
+                    else {
+                        printf("\t|");
+                    }
+                    for (int j = 0; j < sample_count; j++) {
+                        printf("%c", memory_graph[i][j]);
+                    }
+                    printf("\n");
+                }
+                printf("CPU Usage: %f %% \n", ratio);
+		for (int i = 0; i <= 9; i++) {
+                    if (i == 0) {
+                        printf("100%%\t|");
+                    }
+                    else if (i == 9) {
+                        printf("0%%\t|");
+                    }
+                    else {
+                        printf("\t|");
+                    }
+                    for (int j = 0; j < sample_count; j++) {
+                        printf("%c", cpu_graph[i][j]);
+                    }
+                    printf("\n");
+                }
+                total_cpu_time_1 = total_cpu_time_2;
 		total_cpu_util_time_1 = total_cpu_util_time_2;
 	}
 }
-
 void core_row_display(int cores_per_row) {
 	for (int i = 0; i < cores_per_row; i++) {
 		printf("+--+  ");
@@ -344,17 +372,11 @@ int main (int argc, char** argv) {
 		printf("Invalid value. Time delay must be positive.\n");
 		return 0;
 	}
-	if (cpu_flag == 1 && memory_flag == 1) {
-		duo_display(sample_count, tdelay);
-	}
-	else if (cpu_flag == 1) {
-		cpu_display(sample_count, tdelay);
-	}
-	else if (memory_flag == 1) {
-		memory_display(sample_count, tdelay);
-	}
-	if (core_flag == 1) {
-		core_display();
-	}
+	// cpu_display(4, tdelay);
+	// memory_display(min(MAXIMUM_SAMPLE_SIZE, sample_count), min(MAXIMUM_TIME_DELAY, tdelay));
+    	// memory_display(30, min(MAXIMUM_TIME_DELAY, tdelay));
+	// cpu_display(70, 100000);
+	duo_display(10, tdelay);
+	core_display();
 	return 0;
 }
