@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Werror -std=c99 -lm -c -s
+CFLAGS=-Wall -std=c99 -lm -c -s
 OBJ=myMonitoringTool.o aux.o info_fetcher.o flag_handler.o signal_handler.o
 EXEC=Main
 

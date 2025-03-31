@@ -1,16 +1,6 @@
 #include "info_fetcher.h"
 
-void grab_memory_info(double* freeram) {
-	struct sysinfo* si = NULL;
-	si = calloc(1, sizeof(struct sysinfo));
-	int ret = sysinfo(si);
-	if (ret == 0) {
-		*freeram = si->freeram;
-	}
-	free(si);
-}
-
-void fetch_total_ram(int* total_ram_in_byte) {
+double grab_memory_info() {
 	int p[2];
 	if (pipe(p) == -1) {
 		perror("PIPE ERROR. Terminating...\n");
@@ -22,25 +12,105 @@ void fetch_total_ram(int* total_ram_in_byte) {
 		exit(1);
 	}
 	else if (result == 0) {
-		// Close the reading port
-		int total_ram = 0;
+		// Close the reading port for children
 		close(p[0]);
+		long long free_ram = 0;
 		struct sysinfo* si = calloc(1, sizeof(struct sysinfo));
 		int ret = sysinfo(si);
 		if (ret == 0) {
-			total_ram = (double)si->totalram;
+			free_ram = (long long) si->freeram;
 		}
 		free(si);
-		write(p[0], &total_ram, sizeof(int));
+		write(p[1], &free_ram, sizeof(long long));
+		close(p[1]);
+		exit(0);
 	}
 	else {
+		// Close the writing port for parent
 		close(p[1]);
 	}
-	read(p[0], total_ram_in_byte, sizeof(int));
+	long long free_ram_in_byte = 0;
+	read(p[0], &free_ram_in_byte, sizeof(long long));
+	return (double)free_ram_in_byte;
 }
 
+long long fetch_total_ram() {
+	int p[2];
+	if (pipe(p) == -1) {
+		perror("PIPE ERROR. Terminating...\n");
+		exit(1);
+	}
+	int result = fork();
+	if (result < 0) {
+		perror("FORK ERROR. Terminating...\n");
+		exit(1);
+	}
+	else if (result == 0) {
+		// Close the reading port for children
+		close(p[0]);
+		long long total_ram = 0;
+		struct sysinfo* si = calloc(1, sizeof(struct sysinfo));
+		int ret = sysinfo(si);
+		if (ret == 0) {
+			total_ram = (long long) si->totalram;
+		}
+		free(si);
+		write(p[1], &total_ram, sizeof(long long));
+		close(p[1]);
+		exit(0);
+	}
+	else {
+		// Close the writing port for parent
+		close(p[1]);
+	}
+	long long total_ram_in_byte = 0;
+	read(p[0], &total_ram_in_byte, sizeof(long long));
+	return total_ram_in_byte;
+}
 
 void grab_cpu_info(int* cpudata) {
+	/*
+	int p[7][2], i;
+	for (i = 0; i <= 6; i++) {
+		if (pipe(p[i]) == -1) {
+			perror("PIPE ERROR. Terminating...\n");
+			exit(1);
+		}
+		int result = fork();
+		if (result < 0) {
+			perror("FORK ERROR. Terminating...\n");
+			exit(1);
+		}
+		else if (result == 0) {
+			close(p[i][0]);
+			for (int j = 0; j < i; j++) {
+				close(p[j][0]);
+			}
+			char buff[128];
+			int num;
+			FILE* fp = fopen("/proc/stat", "r");
+			if (fp == NULL) {
+				printf("ERROR: Can't open file. Terminating...");
+				return;
+			}
+			if ((fscanf(fp, "%s", buff) == 1) && (strcmp(buff, "cpu") == 0)) {
+				for (i = 0; i <= 6; i++) {
+					fscanf(fp, "%d", &num);
+				}
+			}
+			fclose(fp);
+			write(p[i][1], &num, sizeof(int));
+			close(p[i][1]);
+			exit(0);
+		}
+		else {
+			close(p[i][1]);
+		}
+	} 
+	for (int i = 0; i <= 6; i++) {
+		read(p[i][0], cpuinfo[i], sizeof(int));
+	}
+	*/
 	char buff[128];
 	FILE* fp = fopen("/proc/stat", "r");
 	if (fp == NULL) {
@@ -103,9 +173,7 @@ void core_display() {
 				FILE *cpuinfo = fopen("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq", "r");
 				if (!cpuinfo) {
 					perror("Failed to open /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq");
-					exit(1
-					
-					);
+					exit(1);
 				}
 				char line[256];
 				int max_frequency = 0;

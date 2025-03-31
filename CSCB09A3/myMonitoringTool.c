@@ -42,6 +42,7 @@ int sysinfo(struct sysinfo *info);
 int get_nprocs_conf(void);
 
 void memory_display(int sample_count, int tdelay) {
+	double tdelay_in_sec = (double)tdelay / 1000000;
 	char graph[13][85];
 	for (int i = 0; i < 13; i++) {
 		for (int j = 0; j < 85; j++) {
@@ -51,24 +52,19 @@ void memory_display(int sample_count, int tdelay) {
 	for (int j = 0; j <= sample_count; j++) {
 		graph[9][j] = '_';
 	}
-	double total_ram = 0.0, ram_used = 0.0, freeram = 0.0;
-	// int total_ram_in_byte = 0;
-	struct sysinfo* si = calloc(1, sizeof(struct sysinfo));
-	int ret = sysinfo(si);
-	if (ret == 0) {
-		total_ram = (double)si->totalram;
-	}
-	free(si);
-	double total_ram_in_gb = total_ram / 1073741824;
+	double ram_used = 0.0, freeram = 0.0;
+	long long total_ram_in_byte = fetch_total_ram();
+	double total_ram_in_gb = (double)total_ram_in_byte / 1073741824;
 	for (int instance = 0; instance < sample_count; instance++) {
-		printf("\033[2J");
-		printf("\033[H");
 		usleep(tdelay);
-		grab_memory_info(&freeram);
-		ram_used = total_ram - freeram;
-		double f_index_to_find = ram_used * 100.0 / total_ram;
+		freeram = grab_memory_info();				// Note: ram_used (byte)
+		ram_used = total_ram_in_byte - freeram;
+		double f_index_to_find = ram_used * 100.0 / total_ram_in_byte;
 		int index_to_find = find_index(f_index_to_find);
 		graph[index_to_find][instance] = '#';
+		printf("\033[2J");
+		printf("\033[H");
+		printf("Number of samples: %d -- every %d ms (%.3f secs)\n", sample_count, tdelay, tdelay_in_sec);
 		printf("RAM used: %.4f GB\n", ram_used / 1073741824);
 		for (int i = 0; i <= 9; i++) {
             if (i == 0) {
@@ -101,6 +97,7 @@ void cpu_display(int sample_count, int tdelay)  {
 	}
 	int total_cpu_util_time_1 = 0, total_cpu_util_time_2 = 0, total_cpu_time_1 = 0, total_cpu_time_2 = 0;
 	grab_cpu_info(cpu_data);
+	// Need to have comment on the method
 	for (int i = 0; i <= 6; i++) {
 		total_cpu_time_1 += cpu_data[i];
 	}
@@ -141,7 +138,7 @@ void cpu_display(int sample_count, int tdelay)  {
 }
 
 void duo_display(int sample_count, int tdelay) {
-
+	double tdelay_in_sec = (double)tdelay / 1000000;
 	char memory_graph[13][85], cpu_graph[13][85];
       	int cpu_data[7];
 	for (int i = 0; i < 13; i++) {
@@ -170,8 +167,6 @@ void duo_display(int sample_count, int tdelay) {
 	}
 	total_cpu_util_time_1 = total_cpu_time_1 - cpu_data[3];
 	for (int instance = 0; instance < sample_count; instance++) {
-		printf("\033[2J");
-		printf("\033[H");
 		usleep(tdelay);
 		// STEP 1: MEMORY
 		grab_memory_info(&freeram);
@@ -189,6 +184,9 @@ void duo_display(int sample_count, int tdelay) {
 						((double)(total_cpu_time_2 - total_cpu_time_1));
 		int cpu_index_to_find = find_index(ratio);
 		cpu_graph[cpu_index_to_find][instance] = ':';
+		printf("\033[2J");
+		printf("\033[H");
+		printf("Number of samples: %d -- every %d ms (%.3f secs)\n", sample_count, tdelay, tdelay_in_sec);
 		printf("RAM used: %.4f GB\n", ram_used / 1073741824);
 		for (int i = 0; i <= 9; i++) {
 			if (i == 0) {
@@ -287,8 +285,6 @@ int main (int argc, char** argv) {
 	else if (tdelay > MAXIMUM_TIME_DELAY) {
 		tdelay = MAXIMUM_TIME_DELAY;
 	}
-	// REFACTORING: Chay sleep va sample count o trong main luon. Trong moi ham chi can print thoi
-	// Nhu vay se khong can ham duo_display nua
 	if (memory_flag == 1) {
 		memory_display(sample_count, tdelay);
 	}

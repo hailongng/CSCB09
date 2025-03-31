@@ -10,10 +10,11 @@
 #include<sys/types.h>
 #include<unistd.h>
 
-void grab_memory_info(double* freeram);
+int sysinfo(struct sysinfo *info);
+double grab_memory_info();
 void grab_cpu_info(int* cpudata);
 void core_display();
 void core_row_display(int cores_per_row);
-void fetch_total_ram(int* total_ram_in_byte);
+long long fetch_total_ram();
 
 #endif
