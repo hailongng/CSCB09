@@ -74,26 +74,3 @@ int weird_flag_checker(int argc, char** argv) {
 	return 0;
 }
 
-
-int duplicate_flag_checker(int argc, char** argv) {
-	char* flags[5] = {"--cores", "--memory", "--cpu", "--samples", "--tdelay"};
-	int counter[5] = {0, 0, 0, 0, 0};
-	for (int i = 1; i < argc; i++) {
-		for (int j = 0; j <= 2; j++) {
-			if (strcmp(argv[i], flags[j]) == 0) {
-				counter[j] += 1;
-			}
-		}
-		for (int j = 3; j <= 4; j++) {
-			if (strstr(argv[i], flags[j]) != NULL) {
-				counter[j] += 1;
-			}
-		}
-	}
-	for (int i = 0; i <= 4; i++) {
-		if (counter[i] > 1) {
-			return 1;
-		}
-	}
-	return 0;
-}

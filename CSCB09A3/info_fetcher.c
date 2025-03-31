@@ -10,6 +10,36 @@ void grab_memory_info(double* freeram) {
 	free(si);
 }
 
+void fetch_total_ram(int* total_ram_in_byte) {
+	int p[2];
+	if (pipe(p) == -1) {
+		perror("PIPE ERROR. Terminating...\n");
+		exit(1);
+	}
+	int result = fork();
+	if (result < 0) {
+		perror("FORK ERROR. Terminating...\n");
+		exit(1);
+	}
+	else if (result == 0) {
+		// Close the reading port
+		int total_ram = 0;
+		close(p[0]);
+		struct sysinfo* si = calloc(1, sizeof(struct sysinfo));
+		int ret = sysinfo(si);
+		if (ret == 0) {
+			total_ram = (double)si->totalram;
+		}
+		free(si);
+		write(p[0], &total_ram, sizeof(int));
+	}
+	else {
+		close(p[1]);
+	}
+	read(p[0], total_ram_in_byte, sizeof(int));
+}
+
+
 void grab_cpu_info(int* cpudata) {
 	char buff[128];
 	FILE* fp = fopen("/proc/stat", "r");
@@ -44,27 +74,68 @@ void core_display() {
 	
 	// Fetch information for the cores
 
-	int number_of_cores = get_nprocs_conf();
-	FILE *cpuinfo = fopen("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq", "r");
-	if (!cpuinfo) {
-		perror("Failed to open /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq");
-		return;
+	int p[2][2];
+	for (int i = 0; i <= 1; i++) {
+		if (pipe(p[i]) == -1) {
+			perror("PIPE ERROR. Terminating...\n");
+			exit(1);
+		}
+		int result = fork();
+		if (result < 0) {
+			perror("FORK ERROR. Terminating...\n");
+			exit(1);
+		}
+		else if (result == 0) {
+			// Close the reading port
+			close(p[i][0]);
+			// Close the reading port for the prior child
+			for (int j = 0; j < i; j++) {
+				close(p[j][0]);
+			}
+			if (i == 0) {
+				// Write the number of cores in p[0][1]
+				int number_of_cores = get_nprocs_conf();
+				write(p[0][1], &number_of_cores, sizeof(int));
+				close(p[0][1]);
+				exit(0);
+			}
+			else {
+				FILE *cpuinfo = fopen("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq", "r");
+				if (!cpuinfo) {
+					perror("Failed to open /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq");
+					exit(1
+					
+					);
+				}
+				char line[256];
+				int max_frequency = 0;
+				while (fgets(line, sizeof(line), cpuinfo)) {
+					max_frequency = atoi(line);
+				}
+				fclose(cpuinfo);
+				// Write the maximum frequency p[1][1]
+				write(p[1][1], &max_frequency, sizeof(int));
+				exit(0);
+			}
+		}
+		else {
+			close(p[i][1]);
+		}
 	}
-	char line[256];
-	double max_frequency = 0.0;
-	while (fgets(line, sizeof(line), cpuinfo)) {
-		max_frequency = atoi(line);
-	}
-	max_frequency /= 1000000;
+	int res1, temp_res2;
+	double res2;
+	read(p[0][0], &res1, sizeof(int));
+	read(p[1][0], &temp_res2, sizeof(int));
+	res2 = ((double)temp_res2) / 1000000;
 	
 	// Display the information for the cores
 	
-	printf("Number of cores: %d @ %.2f GHz\n", number_of_cores, max_frequency);
-	while (number_of_cores >= 4) {
+	printf("Number of cores: %d @ %.2f GHz\n", res1, res2);
+	while (res1 >= 4) {
 		core_row_display(4);
-		number_of_cores -= 4;
+		res1 -= 4;
 	}
-	if (number_of_cores > 0) {
-		core_row_display(number_of_cores);
+	if (res1 > 0) {
+		core_row_display(res1);
 	}
 }

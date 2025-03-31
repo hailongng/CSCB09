@@ -12,6 +12,7 @@
 #include "aux.h"
 #include "info_fetcher.h"
 #include "flag_handler.h"
+#include "signal_handler.h"
 
 #ifndef MAXIMUM_CLA
 #define MAXIMUM_CLA 6
@@ -41,18 +42,18 @@ int sysinfo(struct sysinfo *info);
 int get_nprocs_conf(void);
 
 void memory_display(int sample_count, int tdelay) {
-    	char graph[13][85];
-    	for (int i = 0; i < 13; i++) {
-        	for (int j = 0; j < 85; j++) {
-            		graph[i][j] = ' ';
-        	}
-    	}
-    	for (int j = 0; j <= sample_count; j++) {
-        	graph[9][j] = '_';
-    	}
+	char graph[13][85];
+	for (int i = 0; i < 13; i++) {
+		for (int j = 0; j < 85; j++) {
+				graph[i][j] = ' ';
+		}
+	}
+	for (int j = 0; j <= sample_count; j++) {
+		graph[9][j] = '_';
+	}
 	double total_ram = 0.0, ram_used = 0.0, freeram = 0.0;
-	struct sysinfo* si = NULL;
-	si = calloc(1, sizeof(struct sysinfo));
+	// int total_ram_in_byte = 0;
+	struct sysinfo* si = calloc(1, sizeof(struct sysinfo));
 	int ret = sysinfo(si);
 	if (ret == 0) {
 		total_ram = (double)si->totalram;
@@ -70,20 +71,20 @@ void memory_display(int sample_count, int tdelay) {
 		graph[index_to_find][instance] = '#';
 		printf("RAM used: %.4f GB\n", ram_used / 1073741824);
 		for (int i = 0; i <= 9; i++) {
-            		if (i == 0) {
-                		printf("%.1fGB\t|", total_ram_in_gb);
-            		}
-            		else if (i == 9) {
-                		printf("0GB\t|");
-            		}
-            		else {
-                		printf("\t|");
-            		}
-            		for (int j = 0; j < sample_count; j++) {
-                		printf("%c", graph[i][j]);
-            		}
-            	printf("\n");
+            if (i == 0) {
+                printf("%.1fGB\t|", total_ram_in_gb);
+            }
+            else if (i == 9) {
+            	printf("0GB\t|");
+            }
+            else {
+                printf("\t|");
+            }
+            for (int j = 0; j < sample_count; j++) {
+                printf("%c", graph[i][j]);
         	}
+            printf("\n");
+        }
 	}
 }
 
@@ -95,9 +96,9 @@ void cpu_display(int sample_count, int tdelay)  {
 			graph[i][j] = ' ';
 		}
 	}
-    	for (int j = 0; j <= sample_count; j++) {
-        	graph[9][j] = '_';
-    	}
+	for (int j = 0; j <= sample_count; j++) {
+		graph[9][j] = '_';
+	}
 	int total_cpu_util_time_1 = 0, total_cpu_util_time_2 = 0, total_cpu_time_1 = 0, total_cpu_time_2 = 0;
 	grab_cpu_info(cpu_data);
 	for (int i = 0; i <= 6; i++) {
@@ -140,8 +141,6 @@ void cpu_display(int sample_count, int tdelay)  {
 }
 
 void duo_display(int sample_count, int tdelay) {
-
-	// Function to print the memory and the CPU
 
 	char memory_graph[13][85], cpu_graph[13][85];
       	int cpu_data[7];
@@ -191,43 +190,51 @@ void duo_display(int sample_count, int tdelay) {
 		int cpu_index_to_find = find_index(ratio);
 		cpu_graph[cpu_index_to_find][instance] = ':';
 		printf("RAM used: %.4f GB\n", ram_used / 1073741824);
-                for (int i = 0; i <= 9; i++) {
-                    	if (i == 0) {
-			    	printf("%.1fGB\t|", total_ram_in_gb);
-                    	}
-                    	else if (i == 9) {
-                        	printf("0GB\t|");
-                    	}
-                    	else {
-                        	printf("\t|");
-                    	}
-                    	for (int j = 0; j < sample_count; j++) {
-                        	printf("%c", memory_graph[i][j]);
-                    	}
-                    	printf("\n");
-                }
-                printf("CPU Usage: %f %% \n", ratio);
 		for (int i = 0; i <= 9; i++) {
-                    	if (i == 0) {
-                        	printf("100%%\t|");
-                    	}
-                    	else if (i == 9) {
-                        	printf("0%%\t|");
-                    	}
-                    	else {
-                        	printf("\t|");
-                    	}
-                    	for (int j = 0; j < sample_count; j++) {
-                        	printf("%c", cpu_graph[i][j]);
-                    	}
-                    	printf("\n");
-                }
-                total_cpu_time_1 = total_cpu_time_2;
+			if (i == 0) {
+				printf("%.1fGB\t|", total_ram_in_gb);
+			}
+			else if (i == 9) {
+				printf("0GB\t|");
+			}
+			else {
+				printf("\t|");
+			}
+			for (int j = 0; j < sample_count; j++) {
+				printf("%c", memory_graph[i][j]);
+			}
+			printf("\n");
+		}
+		printf("CPU Usage: %f %% \n", ratio);
+		for (int i = 0; i <= 9; i++) {
+			if (i == 0) {
+				printf("100%%\t|");
+			}
+			else if (i == 9) {
+				printf("0%%\t|");
+			}
+			else {
+				printf("\t|");
+			}
+			for (int j = 0; j < sample_count; j++) {
+				printf("%c", cpu_graph[i][j]);
+			}
+			printf("\n");
+		}
+        total_cpu_time_1 = total_cpu_time_2;
 		total_cpu_util_time_1 = total_cpu_util_time_2;
 	}
 }
 
 int main (int argc, char** argv) {
+	if (signal(SIGTSTP, handler_ctrl_z) == SIG_ERR) {
+		perror("Failed to register signal handler for Ctrl Z\n");
+		return 1;
+	}
+	if (signal(SIGINT, handler_ctrl_c) == SIG_ERR) {
+		perror("Failed to register signal handler for Ctrl C\n");
+		return 1;
+	}
 	int core_flag = 0, cpu_flag = 0, memory_flag = 0;
 	int sample_count = DEFAULT_SAMPLE_SIZE;
 	int tdelay = DEFAULT_TIME_DELAY;
@@ -259,10 +266,6 @@ int main (int argc, char** argv) {
 			printf("Weird flag found. Terminating...\n");
 			return 1;
 		}
-		if (duplicate_flag_checker(argc, argv) == 1) {
-			printf("Duplicate flag found. Terminating...\n");
-			return 1;
-		}
 		flag_checker(argc, argv, "--memory", &memory_flag);
 		flag_checker(argc, argv, "--cpu", &cpu_flag);
 		flag_checker(argc, argv, "--cores", &core_flag);
@@ -285,15 +288,9 @@ int main (int argc, char** argv) {
 		tdelay = MAXIMUM_TIME_DELAY;
 	}
 	// REFACTORING: Chay sleep va sample count o trong main luon. Trong moi ham chi can print thoi
-	// Nhu vay se khong can ham duodisplay nua
-	if (memory_flag == 1 && cpu_flag == 1) {
-		duo_display(sample_count, tdelay);
-	}
-	else if (memory_flag == 1) {
+	// Nhu vay se khong can ham duo_display nua
+	if (memory_flag == 1) {
 		memory_display(sample_count, tdelay);
-	}
-	else if (cpu_flag == 1) {
-		cpu_display(sample_count, tdelay);
 	}
 	if (core_flag == 1) {
 		core_display();
