@@ -1,37 +1,14 @@
 #include "info_fetcher.h"
 
 double grab_memory_info() {
-	int p[2];
-	if (pipe(p) == -1) {
-		perror("PIPE ERROR. Terminating...\n");
-		exit(1);
+	long long freeram = 0;
+	struct sysinfo* si = calloc(1, sizeof(struct sysinfo));
+	int ret = sysinfo(si);
+	if (ret == 0) {
+		freeram = si->freeram;
 	}
-	int result = fork();
-	if (result < 0) {
-		perror("FORK ERROR. Terminating...\n");
-		exit(1);
-	}
-	else if (result == 0) {
-		// Close the reading port for children
-		close(p[0]);
-		long long free_ram = 0;
-		struct sysinfo* si = calloc(1, sizeof(struct sysinfo));
-		int ret = sysinfo(si);
-		if (ret == 0) {
-			free_ram = (long long) si->freeram;
-		}
-		free(si);
-		write(p[1], &free_ram, sizeof(long long));
-		close(p[1]);
-		exit(0);
-	}
-	else {
-		// Close the writing port for parent
-		close(p[1]);
-	}
-	long long free_ram_in_byte = 0;
-	read(p[0], &free_ram_in_byte, sizeof(long long));
-	return (double)free_ram_in_byte;
+	free(si);
+	return (double) freeram;
 }
 
 long long fetch_total_ram() {
@@ -69,48 +46,6 @@ long long fetch_total_ram() {
 }
 
 void grab_cpu_info(int* cpudata) {
-	/*
-	int p[7][2], i;
-	for (i = 0; i <= 6; i++) {
-		if (pipe(p[i]) == -1) {
-			perror("PIPE ERROR. Terminating...\n");
-			exit(1);
-		}
-		int result = fork();
-		if (result < 0) {
-			perror("FORK ERROR. Terminating...\n");
-			exit(1);
-		}
-		else if (result == 0) {
-			close(p[i][0]);
-			for (int j = 0; j < i; j++) {
-				close(p[j][0]);
-			}
-			char buff[128];
-			int num;
-			FILE* fp = fopen("/proc/stat", "r");
-			if (fp == NULL) {
-				printf("ERROR: Can't open file. Terminating...");
-				return;
-			}
-			if ((fscanf(fp, "%s", buff) == 1) && (strcmp(buff, "cpu") == 0)) {
-				for (i = 0; i <= 6; i++) {
-					fscanf(fp, "%d", &num);
-				}
-			}
-			fclose(fp);
-			write(p[i][1], &num, sizeof(int));
-			close(p[i][1]);
-			exit(0);
-		}
-		else {
-			close(p[i][1]);
-		}
-	} 
-	for (int i = 0; i <= 6; i++) {
-		read(p[i][0], cpuinfo[i], sizeof(int));
-	}
-	*/
 	char buff[128];
 	FILE* fp = fopen("/proc/stat", "r");
 	if (fp == NULL) {
@@ -140,70 +75,67 @@ void core_row_display(int cores_per_row) {
 	printf("\n");
 }
 
-void core_display() {
-	
-	// Fetch information for the cores
+void core_fetcher(int sample_count, int tdelay, int p[2]) {
+	int child_pid, grandchild_pid;
+	int number_of_cores;
+	double max_frequency;
 
-	int p[2][2];
-	for (int i = 0; i <= 1; i++) {
-		if (pipe(p[i]) == -1) {
-			perror("PIPE ERROR. Terminating...\n");
-			exit(1);
-		}
-		int result = fork();
-		if (result < 0) {
-			perror("FORK ERROR. Terminating...\n");
-			exit(1);
-		}
-		else if (result == 0) {
-			// Close the reading port
-			close(p[i][0]);
-			// Close the reading port for the prior child
-			for (int j = 0; j < i; j++) {
-				close(p[j][0]);
-			}
-			if (i == 0) {
-				// Write the number of cores in p[0][1]
-				int number_of_cores = get_nprocs_conf();
-				write(p[0][1], &number_of_cores, sizeof(int));
-				close(p[0][1]);
-				exit(0);
-			}
-			else {
-				FILE *cpuinfo = fopen("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq", "r");
-				if (!cpuinfo) {
-					perror("Failed to open /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq");
-					exit(1);
-				}
-				char line[256];
-				int max_frequency = 0;
-				while (fgets(line, sizeof(line), cpuinfo)) {
-					max_frequency = atoi(line);
-				}
-				fclose(cpuinfo);
-				// Write the maximum frequency p[1][1]
-				write(p[1][1], &max_frequency, sizeof(int));
-				exit(0);
-			}
-		}
-		else {
-			close(p[i][1]);
-		}
+	child_pid = fork();
+	if (child_pid == -1) {
+		perror("Fork failed\n");
+		close(p[0]);
+		close(p[1]);
+		exit(0);
 	}
-	int res1, temp_res2;
-	double res2;
-	read(p[0][0], &res1, sizeof(int));
-	read(p[1][0], &temp_res2, sizeof(int));
-	res2 = ((double)temp_res2) / 1000000;
-	
-	// Display the information for the cores
-	
-	printf("Number of cores: %d @ %.2f GHz\n", res1, res2);
-	while (res1 >= 4) {
+	else if (child_pid == 0) {
+		close(p[0]);
+		number_of_cores = get_nprocs_conf();
+		grandchild_pid = fork();
+		if (grandchild_pid == -1) {
+			perror("Fork failed\n");
+			close(p[1]);
+			exit(EXIT_FAILURE);
+		}
+		else if (grandchild_pid == 0) {
+			FILE *cpuinfo = fopen("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq", "r");
+			if (!cpuinfo) {
+				perror("Failed to open /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq");
+				return;
+			}
+			char line[256];
+			double max_frequency = 0.0;
+			while (fgets(line, sizeof(line), cpuinfo)) {
+				max_frequency = atoi(line);
+			}
+			max_frequency /= 1000000;
+			fclose(cpuinfo);
+			write(p[1], &max_frequency, sizeof(double));
+			close(p[1]);
+			exit(EXIT_SUCCESS);
+		}
+		wait(NULL);
+		write(p[1], &number_of_cores, sizeof(int));
+		close(p[1]);
+		exit(EXIT_SUCCESS);
+	}
+	else {
+		// Parent process
+		close(p[1]);
+		wait(NULL);
+		read(p[0], &max_frequency, sizeof(double));
+		read(p[0], &number_of_cores, sizeof(int));
+		core_display(sample_count, tdelay, number_of_cores, max_frequency);
+		close(p[0]);
+	}
+}
+
+void core_display(int sample_count, int tdelay, int number_of_cores, double max_frequency) {
+	printf("Number of cores: %d @ %.2f GHz\n", number_of_cores, max_frequency);
+	while (number_of_cores >= 4) {
 		core_row_display(4);
-		res1 -= 4;
+		number_of_cores -= 4;
 	}
-	if (res1 > 0) {
-		core_row_display(res1);
+	if (number_of_cores > 0) {
+		core_row_display(number_of_cores);
 	}
 }

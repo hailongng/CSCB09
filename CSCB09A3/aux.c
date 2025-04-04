@@ -47,3 +47,4 @@ int find_index(double value) {
 	}
 	return 0;
 }
+

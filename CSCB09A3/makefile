@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-Wall -std=c99 -lm -c -s
-OBJ=myMonitoringTool.o aux.o info_fetcher.o flag_handler.o signal_handler.o
+OBJ=myMonitoringTool.o aux.o info_fetcher.o flag_handler.o signal_handler.o cpu_memory_display.o
 EXEC=Main
 
 $(EXEC): $(OBJ)
@@ -8,6 +8,9 @@ $(EXEC): $(OBJ)
 
 myMonitoringTool.o: myMonitoringTool.c aux.h info_fetcher.h flag_handler.h
 	$(CC) myMonitoringTool.c $(CFLAGS)
+
+cpu_memory_display.o: cpu_memory_display.c cpu_memory_display.h
+	$(CC) cpu_memory_display.c $(CFLAGS)
 
 aux.o: aux.c aux.h
 	$(CC) aux.c $(CFLAGS)

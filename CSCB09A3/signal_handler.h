@@ -6,8 +6,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <sys/types.h>
 
 void handler_ctrl_z(int sigval);
-void handler_ctrl_c(int sigval);
+void handler_ctrl_c(int sigval);   
 
 #endif
